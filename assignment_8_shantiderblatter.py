@@ -3,6 +3,7 @@
 import glob
 import re
 from string import punctuation as punct  # string of common punctuation chars
+import os
 
 import matplotlib.pyplot as plt
 import nltk
@@ -21,9 +22,14 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
-# TODO change to the location of your Mini-CORE corpus
-MC_DIR = '/home/<username>/path/to/Mini-CORE/'
+assert nltk.download('averaged_perceptron_tagger')
+assert nltk.download('averaged_perceptron_tagger_ru')
 
+# import external code
+from discourse_markers import markers
+
+
+MC_DIR = 'Mini-CORE/'
 
 def clean(in_file):
     """Remove headers from corpus file."""
@@ -51,6 +57,45 @@ def ttr(in_Text):
     """
     return len(set(in_Text)) / len(in_Text)
 
+def verb_sr(tagged, sentences):
+    """Compute verb-sentence ratio for input Text.
+    (Measures sentence complexity)
+    tagged -- nltk.Text object or list of strings
+    sentences --
+    """
+    verbs = [tok for tok, tag in tagged if tag.startswith("VB")]
+    return (len(verbs)/len(sentences))
+
+def interject_tr(tagged):
+    """Compute interjection-token ratio for input Text.
+
+    tagged -- nltk.Text object or list of strings
+    """
+    interjections = [tok for tok, tag in tagged if tag.startswith("UH")]
+    return (len(interjections)/len(tagged))
+
+def dis_mark_tr(in_Text):
+    """Compute discourse marker to token ratio for input text.
+    in_Text -- nltk.Text object or list of strings
+    """
+    numTimes = 0
+    for token in in_Text:
+        if token in markers:
+            numTimes += 1
+    normedRate = (numTimes / len(in_Text))
+    return normedRate
+
+def contract_tr(raw_text, tok_text):
+    """Compute contraction to token ratio for input text.
+    raw_text --
+    tok_text -- nltk.Text object or list of strings
+    """
+    numTimes = 0
+    contraction_re = r"\s([a-zA-Z]+'[a-zA-Z]+)\s"
+    for match in re.findall(contraction_re, raw_text):
+        numTimes += 1
+    normedRate = (numTimes / len(tok_text))
+    return normedRate
 
 def pro1_tr(in_Text):
     """Compute 1st person pronoun-token ratio for input Text.
@@ -92,7 +137,7 @@ def punct_tr(in_Text):
 
 
 # add feature names HERE
-feat_names = ['ttr', '1st-pro', '2nd-pro', '3rd-pro', 'punct', 'genre']
+feat_names = ['ttr', '1st-pro', '2nd-pro', '3rd-pro', 'punct', 'dis-mark', 'contract', 'sentence-complexity', 'interjections', 'genre']
 with open('mc_feat_names.txt', 'w') as name_file:
     name_file.write('\t'.join(feat_names))
 
@@ -102,10 +147,11 @@ with open('mc_features.csv', 'w') as out_file:
         with open(f) as the_file:
             raw_text = clean(the_file)
         tok_text = nltk.word_tokenize(raw_text)
+        sent_text = nltk.sent_tokenize(raw_text)
+        tagged_text = nltk.pos_tag(raw_text)
         # call the function HERE
         print(ttr(tok_text), pro1_tr(tok_text), pro2_tr(tok_text),
-              pro3_tr(tok_text), punct_tr(tok_text), subcorp(f),
-              sep=',', file=out_file)
+              pro3_tr(tok_text), punct_tr(tok_text), dis_mark_tr(tok_text), contract_tr(raw_text, tok_text), verb_sr(tagged_text, sent_text), interject_tr(tagged_text), subcorp(f), sep=',', file=out_file)
     print()  # newline after progress dots
 
 ###############################################################################
